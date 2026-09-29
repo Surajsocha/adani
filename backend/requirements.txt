@@ -1,0 +1,47 @@
+# ============================================================
+#  Adani DTPS – E-Logbook System
+#  Backend Requirements
+#  Python 3.10+
+# ============================================================
+
+# ── Core Django ─────────────────────────────────────────────
+Django>=6.1.1
+
+# ── Django REST Framework ────────────────────────────────────
+djangorestframework>=3.18.1
+
+# ── JWT Authentication ───────────────────────────────────────
+djangorestframework-simplejwt>=5.5.1
+PyJWT>=2.8.0
+
+# ── JWT Token Blacklist (for logout) ─────────────────────────
+# (included inside djangorestframework-simplejwt)
+
+# ── CORS Headers ────────────────────────────────────────────
+django-cors-headers>=4.3.1
+
+# ── MySQL Database Driver ────────────────────────────────────
+mysqlclient>=2.3.0
+
+# ── Image/File Handling ──────────────────────────────────────
+Pillow>=10.0.0
+
+# ── API Filtering ────────────────────────────────────────────
+django-filter>=26.1
+
+# ── OTP (One-Time Password) ──────────────────────────────────
+pyotp>=2.10.0
+
+# ── Django Extensions (shell_plus, etc.) ─────────────────────
+django-extensions>=4.1
+
+# ── Environment Variables (.env) ─────────────────────────────
+python-decouple>=3.8
+
+# ── ASGI / WSGI Server dependencies ─────────────────────────
+asgiref>=3.7.0
+sqlparse>=0.5.0
+tzdata>=2024.1
+
+# ── Excel Report Generation (SOW – Report Management) ───────────────────────
+openpyxl>=3.1.0
