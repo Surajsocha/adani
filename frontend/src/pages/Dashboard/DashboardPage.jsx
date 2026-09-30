@@ -220,6 +220,68 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Department Trends + Event Severity Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        {/* Department-wise Trends */}
+        <div className="card">
+          <div className="card-header"><span className="card-title"><FiActivity /> Department-wise Event Trends</span></div>
+          <div className="card-body">
+            {stats?.department_trends?.length > 0 ? (
+              <div>
+                {stats.department_trends.map((d, i) => {
+                  const maxCount = Math.max(...stats.department_trends.map(x => x.count), 1)
+                  const pct = (d.count / maxCount) * 100
+                  const DEPT_LABELS = {
+                    ahp: 'AHP', operations: 'Operations', electrical: 'Electrical',
+                    mechanical: 'Mechanical', ci: 'C&I', chp: 'CHP', ash_handling: 'Ash Handling',
+                  }
+                  return (
+                    <div key={d.department} style={{ marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 600 }}>{DEPT_LABELS[d.department] || d.department}</span>
+                        <span className="font-mono" style={{ fontWeight: 700 }}>{d.count}</span>
+                      </div>
+                      <div style={{ height: '8px', background: '#F0F4FA', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`, borderRadius: '4px',
+                          background: `hsl(${210 - i * 30}, 65%, 45%)`,
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>
+                No department trend data available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Event Severity Distribution */}
+        <div className="card">
+          <div className="card-header"><span className="card-title">⚠️ Incident Statistics by Severity</span></div>
+          <div className="card-body" style={{ display: 'flex', justifyContent: 'center' }}>
+            {eventPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={eventPieData} cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`} dataKey="value">
+                    {eventPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px', color: 'var(--color-text-muted)' }}>
+                No event data available
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Recent Logs */}
       <div className="card" style={{ marginBottom: '16px' }}>
         <div className="card-header">

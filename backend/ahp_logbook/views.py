@@ -510,4 +510,155 @@ class DashboardStatsView(viewsets.ViewSet):
             },
             'shift_breakdown': shift_data,
             'user_activity': user_activity,
+            'department_trends': list(
+                EventRecord.objects.values('department')
+                .annotate(count=Count('id'))
+                .order_by('-count')
+            ),
         })
+
+
+# ─── AUTO-SAVE (SOW Section B) ──────────────────────────────────────────────
+
+class AutoSaveView(viewsets.ViewSet):
+    """
+    Auto-save endpoint for logbook entries.
+    Accepts partial data and saves/updates a draft entry without full validation.
+    SOW Section B requires auto-save functionality.
+    """
+    permission_classes = [IsOperatorOrHigher]
+
+    def create(self, request):
+        log_type = request.data.get('log_type', 'dry')  # dry or wet
+        entry_id = request.data.get('entry_id')
+        data = request.data.get('data', {})
+
+        try:
+            if log_type == 'dry':
+                if entry_id:
+                    entry = AHPDryLogEntry.objects.get(id=entry_id, prepared_by=request.user)
+                    if entry.status != 'draft':
+                        return Response({'error': 'Can only auto-save draft entries.'}, status=status.HTTP_400_BAD_REQUEST)
+                    for key, value in data.items():
+                        if hasattr(entry, key) and key not in ('id', 'prepared_by', 'status'):
+                            setattr(entry, key, value if value != '' else None)
+                    entry.save()
+                else:
+                    data['prepared_by'] = request.user
+                    data['status'] = 'draft'
+                    entry = AHPDryLogEntry.objects.create(**{
+                        k: v for k, v in data.items()
+                        if hasattr(AHPDryLogEntry, k) and k not in ('id',)
+                    })
+                return Response({
+                    'message': 'Auto-saved successfully.',
+                    'entry_id': entry.id,
+                    'log_type': 'dry',
+                    'saved_at': entry.updated_at.isoformat(),
+                })
+
+            elif log_type == 'wet':
+                if entry_id:
+                    entry = AHPWetLogEntry.objects.get(id=entry_id, prepared_by=request.user)
+                    if entry.status != 'draft':
+                        return Response({'error': 'Can only auto-save draft entries.'}, status=status.HTTP_400_BAD_REQUEST)
+                    for key, value in data.items():
+                        if hasattr(entry, key) and key not in ('id', 'prepared_by', 'status'):
+                            setattr(entry, key, value if value != '' else None)
+                    entry.save()
+                else:
+                    data['prepared_by'] = request.user
+                    data['status'] = 'draft'
+                    entry = AHPWetLogEntry.objects.create(**{
+                        k: v for k, v in data.items()
+                        if hasattr(AHPWetLogEntry, k) and k not in ('id',)
+                    })
+                return Response({
+                    'message': 'Auto-saved successfully.',
+                    'entry_id': entry.id,
+                    'log_type': 'wet',
+                    'saved_at': entry.updated_at.isoformat(),
+                })
+
+            return Response({'error': 'Invalid log_type. Use "dry" or "wet".'}, status=status.HTTP_400_BAD_REQUEST)
+
+        except AHPDryLogEntry.DoesNotExist:
+            return Response({'error': 'Dry entry not found or not owned by you.'}, status=status.HTTP_404_NOT_FOUND)
+        except AHPWetLogEntry.DoesNotExist:
+            return Response({'error': 'Wet entry not found or not owned by you.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': f'Auto-save failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ─── ESCALATION MECHANISM (SOW Section E) ────────────────────────────────────
+
+class EscalationView(viewsets.ViewSet):
+    """
+    Escalation mechanism: checks for overdue approvals and triggers
+    escalation notifications to department heads and superadmins.
+    SOW Section E requires an escalation mechanism.
+    """
+    permission_classes = [IsSupervisorOrHigher]
+
+    def list(self, request):
+        """Get list of entries requiring escalation (submitted > 24hrs ago)."""
+        from datetime import timedelta
+        threshold = timezone.now() - timedelta(hours=24)
+
+        overdue_dry = AHPDryLogEntry.objects.filter(
+            status='submitted', updated_at__lt=threshold
+        ).select_related('prepared_by')
+        overdue_wet = AHPWetLogEntry.objects.filter(
+            status='submitted', updated_at__lt=threshold
+        ).select_related('prepared_by')
+
+        return Response({
+            'overdue_dry': AHPDryLogListSerializer(overdue_dry, many=True).data if hasattr(AHPDryLogListSerializer, 'Meta') else [],
+            'overdue_wet': AHPWetLogListSerializer(overdue_wet, many=True).data if hasattr(AHPWetLogListSerializer, 'Meta') else [],
+            'dry_count': overdue_dry.count(),
+            'wet_count': overdue_wet.count(),
+            'total_overdue': overdue_dry.count() + overdue_wet.count(),
+        })
+
+    @action(detail=False, methods=['post'])
+    def trigger(self, request):
+        """Manually trigger escalation for all overdue entries."""
+        from datetime import timedelta
+        threshold = timezone.now() - timedelta(hours=24)
+
+        overdue_dry = AHPDryLogEntry.objects.filter(
+            status='submitted', updated_at__lt=threshold
+        ).select_related('prepared_by')
+        overdue_wet = AHPWetLogEntry.objects.filter(
+            status='submitted', updated_at__lt=threshold
+        ).select_related('prepared_by')
+
+        escalation_count = 0
+
+        for entry in overdue_dry:
+            hours_pending = (timezone.now() - entry.updated_at).total_seconds() / 3600
+            notify_supervisors(
+                request.user, 'escalation', 'critical',
+                f'⚠️ ESCALATION: Dry Log Overdue – {entry.date} {entry.get_shift_display()}',
+                f'Dry System logbook entry for {entry.date} ({entry.get_shift_display()}) by {entry.prepared_by.full_name} has been pending approval for {int(hours_pending)} hours. Immediate action required.',
+                f'/logbook/ahp/dry/{entry.id}'
+            )
+            escalation_count += 1
+
+        for entry in overdue_wet:
+            hours_pending = (timezone.now() - entry.updated_at).total_seconds() / 3600
+            notify_supervisors(
+                request.user, 'escalation', 'critical',
+                f'⚠️ ESCALATION: Wet Log Overdue – {entry.date} {entry.get_shift_display()}',
+                f'Wet System logbook entry for {entry.date} ({entry.get_shift_display()}) by {entry.prepared_by.full_name} has been pending approval for {int(hours_pending)} hours. Immediate action required.',
+                f'/logbook/ahp/wet/{entry.id}'
+            )
+            escalation_count += 1
+
+        log_audit(request, 'submit', 'Escalation', '', f'Triggered {escalation_count} escalations')
+
+        return Response({
+            'message': f'Escalation triggered for {escalation_count} overdue entries.',
+            'escalation_count': escalation_count,
+        })
+

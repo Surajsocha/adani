@@ -8,6 +8,8 @@ class Department(models.Model):
         ('electrical', 'Electrical'),
         ('mechanical', 'Mechanical'),
         ('ci', 'Control & Instrumentation'),
+        ('chp', 'CHP - Coal Handling Plant'),
+        ('ash_handling', 'Ash Handling'),
     ]
     code = models.CharField(max_length=20, unique=True, choices=DEPT_CHOICES)
     name = models.CharField(max_length=100)

@@ -17,6 +17,15 @@ export default function SearchPage() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [userId, setUserId] = useState('')
+  const [users, setUsers] = useState([])
+
+  // Fetch users for the user filter
+  useEffect(() => {
+    api.get('/users/users/?page_size=100').then(res => {
+      setUsers(res.data.results || res.data || [])
+    }).catch(() => {})
+  }, [])
 
   const handleSearch = async (e) => {
     e?.preventDefault()
@@ -31,6 +40,7 @@ export default function SearchPage() {
       if (department) params.append('department', department)
       if (category) params.append('category', category)
       if (equipmentTag) params.append('equipment_tag', equipmentTag)
+      if (userId) params.append('user', userId)
 
       const res = await api.get(`/logbook/ahp/search/?${params.toString()}`)
       setResults(res.data)
@@ -117,11 +127,23 @@ export default function SearchPage() {
                     <option value="breakdown">Breakdown</option>
                     <option value="safety">Safety</option>
                     <option value="near_miss">Near Miss</option>
+                    <option value="environmental">Environmental</option>
+                    <option value="instruction">Operational Instruction</option>
+                    <option value="maintenance">Maintenance</option>
                   </select>
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Equipment Tag</label>
                   <input type="text" className="form-control font-mono" placeholder="e.g. COMP-1" value={equipmentTag} onChange={e => setEquipmentTag(e.target.value)} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">User</label>
+                  <select className="form-control" value={userId} onChange={e => setUserId(e.target.value)}>
+                    <option value="">All Users</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.employee_id})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}

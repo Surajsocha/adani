@@ -4,7 +4,7 @@ from .views import (
     AHPDryLogViewSet, AHPWetLogViewSet,
     EventRecordViewSet, ShiftHandoverViewSet,
     ArchivedLogbookViewSet, AdvancedSearchView,
-    DashboardStatsView,
+    DashboardStatsView, AutoSaveView, EscalationView,
 )
 
 router = DefaultRouter()
@@ -15,6 +15,8 @@ router.register('handover', ShiftHandoverViewSet, basename='shift-handover')
 router.register('archive', ArchivedLogbookViewSet, basename='archived-logbook')
 router.register('search', AdvancedSearchView, basename='advanced-search')
 router.register('dashboard-stats', DashboardStatsView, basename='dashboard-stats')
+router.register('auto-save', AutoSaveView, basename='auto-save')
+router.register('escalation', EscalationView, basename='escalation')
 
 urlpatterns = [
     path('', include(router.urls)),
